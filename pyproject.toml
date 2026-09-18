@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "forecast"
+version = "1.0.0"
+description = "Time series forecasting: baselines, exponential smoothing, parameter search and rolling-origin backtesting."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Umer Hashmi" }]
+requires-python = ">=3.10"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = []
+
+[project.optional-dependencies]
+charts = ["matplotlib>=3.7"]
+dev = ["pytest>=8", "ruff==0.16.8", "matplotlib>=3.7"]
+
+[project.scripts]
+forecast = "forecast.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+# An explicit rule set, rather than whatever the newest ruff turns on by default:
+# an unpinned linter with implicit rules means CI breaks on someone else's release
+# schedule, not on a change to this code.
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# The tests reach into fitted state (_season, _trend, _offset) on purpose: the
+# invariants they pin are internal ones, and checking them through the public
+# forecast would only prove the forecast is self-consistent.
+"tests/*" = ["SLF001"]
