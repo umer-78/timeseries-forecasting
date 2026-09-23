@@ -219,6 +219,16 @@
     .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; margin-top: 8px; color: var(--muted); }
     .linekey { display: inline-block; width: 18px; height: 3px; margin-right: 6px; vertical-align: middle; border-radius: 2px; }
     .hw-only { opacity: 0.35; pointer-events: none; }
+    .diag-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+    @media (min-width: 720px) { .diag-grid { grid-template-columns: 1fr 1fr; } }
+    .fold-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+    .fold-row input[type=range] { flex: 1; min-width: 160px; }
+    .hint {
+      padding: 12px 14px; border-radius: var(--radius); font-size: 14px; margin-top: 10px;
+      background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+      color: var(--text-secondary); animation: slideIn 0.35s var(--ease) both;
+    }
+    .synth-controls { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 12px; }
     input[type="range"] {
       -webkit-appearance: none; appearance: none;
       width: 100%; height: 6px; padding: 0; border: none;
@@ -361,6 +371,96 @@
       <div id="winner" class="muted" style="margin-top:10px"></div>
     </section>
 
+    <section class="card" aria-labelledby="synth-h">
+      <h2 id="synth-h"><span class="section-num">04</span> Synthetic series generator</h2>
+      <p class="muted" style="margin-top:0">Build your own series — trend, seasonal amplitude, noise and seed are yours to set — then forecast it live with any model above. Switch back to the embedded monthly-sales series whenever you like.</p>
+      <div class="row" style="margin-bottom:10px">
+        <div>
+          <label for="seriesSource">Series source</label>
+          <select id="seriesSource">
+            <option value="embedded" selected>embedded monthly sales (72 pts)</option>
+            <option value="synthetic">synthetic (generated)</option>
+          </select>
+        </div>
+        <div>
+          <label for="synthSeed">Seed</label>
+          <input id="synthSeed" type="number" value="7" min="1" step="1">
+        </div>
+      </div>
+      <div class="synth-controls" id="synthControls" hidden>
+        <div>
+          <label for="synthTrend">Trend slope <span class="mono" id="trendVal">0.30</span></label>
+          <input id="synthTrend" type="range" min="-1" max="1.5" step="0.05" value="0.3">
+        </div>
+        <div>
+          <label for="synthAmp">Seasonal amplitude <span class="mono" id="ampVal">0.35</span></label>
+          <input id="synthAmp" type="range" min="0" max="0.9" step="0.05" value="0.35">
+        </div>
+        <div>
+          <label for="synthNoise">Noise σ <span class="mono" id="noiseVal">0.08</span></label>
+          <input id="synthNoise" type="range" min="0" max="0.4" step="0.01" value="0.08">
+        </div>
+        <div>
+          <label for="synthPoints">Points <span class="mono" id="ptsVal">72</span></label>
+          <input id="synthPoints" type="range" min="36" max="120" step="12" value="72">
+        </div>
+      </div>
+      <div class="hint" id="synthHint" hidden>Synthetic series active — the charts and metric tables above now score forecasts of <em>your</em> series with the same real model ports.</div>
+    </section>
+
+    <section class="card" aria-labelledby="ov-h">
+      <h2 id="ov-h"><span class="section-num">05</span> Model comparison overlay</h2>
+      <p class="muted" style="margin-top:0">Naive, SES, Holt and Holt-Winters forecast the same hold-out window on the same chart — every line comes from the real recursive updates in <code class="mono">models</code> above, fitted on the current train split.</p>
+      <canvas id="overlay" width="920" height="320" role="img" aria-label="Forecast overlay of four models"></canvas>
+      <div class="legend" id="ovLegend"></div>
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th>model</th><th class="num">MAE</th><th class="num">RMSE</th><th class="num">MAPE</th><th class="num">MASE</th></tr></thead>
+          <tbody id="ovBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="bt-h">
+      <h2 id="bt-h"><span class="section-num">06</span> Backtest walkthrough — rolling origin</h2>
+      <p class="muted" style="margin-top:0">One split can flatter a model. Step through expanding-window folds: fit on everything before the origin, forecast the next block, score it, then roll the origin forward. The bars below each fold are that fold's MASE for the selected model.</p>
+      <div class="fold-row">
+        <button id="foldPrev">← Prev fold</button>
+        <input id="foldSlider" type="range" min="0" max="2" step="1" value="0">
+        <button id="foldNext">Next fold →</button>
+        <span class="mono" id="foldLabel">fold 1 / 3</span>
+      </div>
+      <canvas id="backtest" width="920" height="300" role="img" aria-label="Backtest fold train and test windows"></canvas>
+      <div class="legend">
+        <span><span class="linekey" style="background:var(--accent)"></span>train window</span>
+        <span><span class="linekey" style="background:#f59e0b"></span>test block (actual)</span>
+        <span><span class="linekey" style="background:var(--good)"></span>forecast on this fold</span>
+      </div>
+      <div class="stats" id="foldStats"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>fold</th><th class="num">train size</th><th class="num">test size</th><th class="num">MASE</th><th class="num">MAE</th><th class="num">RMSE</th><th class="num">MAPE</th></tr></thead>
+          <tbody id="foldBody"></tbody>
+        </table>
+      </div>
+      <div class="hint" id="foldSummary"></div>
+    </section>
+
+    <section class="card" aria-labelledby="diag-h">
+      <h2 id="diag-h"><span class="section-num">07</span> Residual diagnostics</h2>
+      <p class="muted" style="margin-top:0">Residuals are hold-out actual minus forecast for the selected model. Left: autocorrelation-style bars for lags 1–12 — large bars mean the model left structure in the errors. Right: a quick normality hint from skewness and excess kurtosis.</p>
+      <div class="diag-grid">
+        <div>
+          <canvas id="acf" width="440" height="260" role="img" aria-label="Autocorrelation of residuals"></canvas>
+          <div class="legend"><span class="muted">residual ACF, lags 1–12 (|r| &gt; 2/√n flagged)</span></div>
+        </div>
+        <div>
+          <div class="stats" id="diagStats" style="margin-top:0"></div>
+          <div class="hint" id="normalityHint"></div>
+        </div>
+      </div>
+    </section>
+
     <section class="card" aria-labelledby="why-h">
       <h2 id="why-h"><span class="section-num">03</span> Four things this gets right</h2>
       <ul class="muted" style="margin:0; padding-left:1.2em; line-height:1.7">
@@ -376,7 +476,8 @@
 
   <script>
     // 72 monthly revenue points from data/monthly-sales.csv
-    const SERIES = [40933,36543,40629,42187,47214,44957,44541,43343,49250,51412,55194,63838,45907,43933,50494,50402,53906,54172,50106,51216,53388,54909,60729,71927,47358,47848,56826,58055,60861,59742,57193,57530,60516,62978,67706,81314,57279,54827,60569,63433,65972,63709,63487,62591,66892,69300,72889,88564,63393,58811,68120,72411,73909,72244,67950,70205,74154,82319,78955,96350,68902,65160,72316,80167,76250,78784,74220,72848,77520,82516,89613,103579];
+    const EMBEDDED = [40933,36543,40629,42187,47214,44957,44541,43343,49250,51412,55194,63838,45907,43933,50494,50402,53906,54172,50106,51216,53388,54909,60729,71927,47358,47848,56826,58055,60861,59742,57193,57530,60516,62978,67706,81314,57279,54827,60569,63433,65972,63709,63487,62591,66892,69300,72889,88564,63393,58811,68120,72411,73909,72244,67950,70205,74154,82319,78955,96350,68902,65160,72316,80167,76250,78784,74220,72848,77520,82516,89613,103579];
+    let SERIES = EMBEDDED;
     const SEASON = 12;
 
     // === Models (ports src/forecast/models.py) ===
@@ -477,6 +578,66 @@
       const scale = sum / n;
       return mae(a, p) / scale;
     }
+    function mape(a, p) {
+      let total = 0, n = 0;
+      for (let i = 0; i < a.length; i++) {
+        if (Math.abs(a[i]) < 1e-9) continue;
+        total += Math.abs((a[i] - p[i]) / a[i]); n++;
+      }
+      return n ? (total / n) * 100 : NaN;
+    }
+
+    function mulberry32(a) {
+      return function () {
+        let t = (a += 0x6d2b79f5);
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function gauss(rng) {
+      let u = 0, v = 0;
+      while (u === 0) u = rng();
+      while (v === 0) v = rng();
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    }
+    function syntheticSeries(seed, trend, amp, noise, n) {
+      const rng = mulberry32(seed >>> 0);
+      const base = 50000;
+      const out = [];
+      for (let i = 0; i < n; i++) {
+        const seasonal = amp * Math.sin((2 * Math.PI * i) / SEASON) + amp * 0.4 * Math.cos((4 * Math.PI * i) / SEASON);
+        const t = 1 + (trend * i) / n;
+        const v = base * t * (1 + seasonal) * (1 + gauss(rng) * noise);
+        out.push(Math.max(v, 100));
+      }
+      return out;
+    }
+
+    function acf(residuals, maxLag) {
+      const n = residuals.length;
+      const mean = residuals.reduce((a, b) => a + b, 0) / n;
+      let denom = 0;
+      for (const r of residuals) denom += (r - mean) ** 2;
+      const out = [];
+      for (let lag = 1; lag <= maxLag; lag++) {
+        let num = 0;
+        for (let i = lag; i < n; i++) num += (residuals[i] - mean) * (residuals[i - lag] - mean);
+        out.push(denom ? num / denom : 0);
+      }
+      return out;
+    }
+    function residMoments(residuals) {
+      const n = residuals.length;
+      const mean = residuals.reduce((a, b) => a + b, 0) / n;
+      const m2 = residuals.reduce((a, r) => a + (r - mean) ** 2, 0) / n;
+      const sd = Math.sqrt(m2);
+      const m3 = residuals.reduce((a, r) => a + (r - mean) ** 3, 0) / n;
+      const m4 = residuals.reduce((a, r) => a + (r - mean) ** 4, 0) / n;
+      const skew = sd ? m3 / Math.pow(sd, 3) : 0;
+      const exKurt = m2 ? m4 / (m2 * m2) - 3 : 0;
+      return { mean, sd, skew, exKurt, n };
+    }
 
     function fitModel(key, train, alpha, beta, gamma) {
       const m = Object.create(models[key]);
@@ -491,13 +652,26 @@
     }
 
     // === UI ===
+    let coneT = 1, coneRaf = 0;
+    function animateCone() {
+      cancelAnimationFrame(coneRaf);
+      const start = performance.now();
+      function frame(now) {
+        const t = Math.min((now - start) / 650, 1);
+        coneT = 1 - Math.pow(1 - t, 3);
+        render(false);
+        if (t < 1) coneRaf = requestAnimationFrame(frame);
+        else { coneT = 1; }
+      }
+      coneRaf = requestAnimationFrame(frame);
+    }
     const chart = document.getElementById("chart");
     const ctx = chart.getContext("2d");
     const hwKeys = new Set(["holt-winters", "holt", "holt-damped", "ses"]);
 
     function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 
-    function render() {
+    function render(animate = true) {
       const key = document.getElementById("model").value;
       const hold = Number(document.getElementById("holdout").value);
       const horizon = Number(document.getElementById("horizon").value);
@@ -523,6 +697,7 @@
         mae: mae(test, scoreFc),
         rmse: rmse(test, scoreFc),
         smape: smape(test, scoreFc),
+        mape: mape(test, scoreFc),
       };
 
       // residual bands from one-step-ish residual std on train (in-sample refit residuals)
@@ -578,15 +753,15 @@
       const start = SERIES.length - hold;
       ctx.fillStyle = "rgba(37,99,235,0.10)";
       ctx.beginPath();
-      for (let i = 0; i < horizon; i++) { const yv = Y(fcFull[i] + bands[i].hi95); i === 0 ? ctx.moveTo(X(start + i), yv) : ctx.lineTo(X(start + i), yv); }
-      for (let i = horizon - 1; i >= 0; i--) ctx.lineTo(X(start + i), Y(fcFull[i] - bands[i].lo95));
+      for (let i = 0; i < horizon; i++) { const yv = Y(fcFull[i] + bands[i].hi95 * coneT); i === 0 ? ctx.moveTo(X(start + i), yv) : ctx.lineTo(X(start + i), yv); }
+      for (let i = horizon - 1; i >= 0; i--) ctx.lineTo(X(start + i), Y(fcFull[i] - bands[i].lo95 * coneT));
       ctx.closePath(); ctx.fill();
 
       // 80% band
       ctx.fillStyle = "rgba(37,99,235,0.18)";
       ctx.beginPath();
-      for (let i = 0; i < horizon; i++) { const yv = Y(fcFull[i] + bands[i].hi80); i === 0 ? ctx.moveTo(X(start + i), yv) : ctx.lineTo(X(start + i), yv); }
-      for (let i = horizon - 1; i >= 0; i--) ctx.lineTo(X(start + i), Y(fcFull[i] - bands[i].lo80));
+      for (let i = 0; i < horizon; i++) { const yv = Y(fcFull[i] + bands[i].hi80 * coneT); i === 0 ? ctx.moveTo(X(start + i), yv) : ctx.lineTo(X(start + i), yv); }
+      for (let i = horizon - 1; i >= 0; i--) ctx.lineTo(X(start + i), Y(fcFull[i] - bands[i].lo80 * coneT));
       ctx.closePath(); ctx.fill();
 
       // train line
@@ -617,6 +792,7 @@
         <div class="stat"><div class="k">MAE</div><div class="v">${Math.round(scores.mae).toLocaleString()}</div></div>
         <div class="stat"><div class="k">RMSE</div><div class="v">${Math.round(scores.rmse).toLocaleString()}</div></div>
         <div class="stat"><div class="k">sMAPE</div><div class="v">${scores.smape.toFixed(1)}%</div></div>
+        <div class="stat"><div class="k">MAPE</div><div class="v">${Number.isFinite(scores.mape) ? scores.mape.toFixed(1) + "%" : "—"}</div></div>
         <div class="stat"><div class="k">train pts</div><div class="v">${train.length}</div></div>
       `;
 
@@ -645,7 +821,328 @@
       } else {
         winner.innerHTML = `<span style="color:var(--bad);font-weight:600">No model beats seasonal naive</span> here (best MASE ${best.mase.toFixed(3)}). On data whose main structure is the seasonal shape, that is the honest answer — the baseline stays in the table for exactly this reason.`;
       }
+
+      renderOverlay(train, test, alpha, beta, gamma);
+      renderBacktest(key, alpha, beta, gamma);
+      renderDiagnostics(test, scoreFc);
+      if (animate) animateCone();
     }
+
+    function renderOverlay(train, test, alpha, beta, gamma) {
+      const hold = test.length;
+      const ov = document.getElementById("overlay");
+      const octx = ov.getContext("2d");
+      const dpr = window.devicePixelRatio || 1;
+      const w = ov.clientWidth || 920, h = 320;
+      ov.width = w * dpr; ov.height = h * dpr; ov.style.height = h + "px";
+      octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      octx.clearRect(0, 0, w, h);
+
+      const keys = ["naive", "ses", "holt", "holt-winters"];
+      const colors = { naive: "#6b7280", ses: "#f59e0b", holt: "#8b5cf6", "holt-winters": "#059669" };
+      const fcs = keys.map((k) => {
+        const m = fitModel(k, train, alpha, beta, gamma);
+        return { k, name: m.name, fc: m.predict(hold) };
+      });
+
+      const pad = { l: 56, r: 14, t: 16, b: 30 };
+      const nTotal = SERIES.length;
+      const allVals = SERIES.concat(...fcs.map((f) => f.fc), ...test);
+      const min = Math.min(...allVals) * 0.97, max = Math.max(...allVals) * 1.02;
+      const X = (i) => pad.l + (i / (nTotal - 1)) * (w - pad.l - pad.r);
+      const Y = (v) => pad.t + (1 - (v - min) / (max - min || 1)) * (h - pad.t - pad.b);
+      const muted = css("--muted"), border = css("--border"), accent = css("--accent");
+
+      octx.strokeStyle = border; octx.fillStyle = muted; octx.font = "11px ui-monospace, monospace";
+      for (let g = 0; g <= 4; g++) {
+        const v = min + ((max - min) * g) / 4;
+        const yy = Y(v);
+        octx.beginPath(); octx.moveTo(pad.l, yy); octx.lineTo(w - pad.r, yy); octx.stroke();
+        octx.textAlign = "right"; octx.fillText(Math.round(v).toLocaleString(), pad.l - 6, yy + 3);
+      }
+
+      // history
+      octx.strokeStyle = accent; octx.lineWidth = 1.6; octx.globalAlpha = 0.7;
+      octx.beginPath();
+      train.forEach((v, i) => (i ? octx.lineTo(X(i), Y(v)) : octx.moveTo(X(i), Y(v))));
+      octx.stroke(); octx.globalAlpha = 1;
+
+      // actual hold-out
+      octx.strokeStyle = "#f59e0b"; octx.lineWidth = 2;
+      octx.beginPath();
+      test.forEach((v, i) => { const xx = X(train.length + i); i === 0 ? octx.moveTo(xx, Y(v)) : octx.lineTo(xx, Y(v)); });
+      octx.stroke();
+
+      // divider
+      const divX = X(train.length - 0.5);
+      octx.strokeStyle = muted; octx.setLineDash([4, 4]);
+      octx.beginPath(); octx.moveTo(divX, pad.t); octx.lineTo(divX, h - pad.b); octx.stroke(); octx.setLineDash([]);
+
+      // forecasts
+      fcs.forEach(({ k, fc }) => {
+        octx.strokeStyle = colors[k]; octx.lineWidth = 2; octx.setLineDash([5, 4]);
+        octx.beginPath();
+        octx.moveTo(X(train.length - 1), Y(train[train.length - 1]));
+        fc.forEach((v, i) => octx.lineTo(X(train.length + i), Y(v)));
+        octx.stroke(); octx.setLineDash([]);
+      });
+
+      octx.fillStyle = muted; octx.textAlign = "left";
+      octx.fillText("history", pad.l, h - 8);
+      octx.textAlign = "right"; octx.fillText("hold-out + forecasts", w - pad.r, h - 8);
+
+      document.getElementById("ovLegend").innerHTML =
+        `<span><span class="linekey" style="background:${accent}"></span>history</span>` +
+        `<span><span class="linekey" style="background:#f59e0b"></span>actual hold-out</span>` +
+        fcs.map(({ k, name }) => `<span><span class="linekey" style="background:${colors[k]}"></span>${name}</span>`).join("");
+
+      document.getElementById("ovBody").innerHTML = fcs.map(({ k, name, fc }) => {
+        const m = mase(test, fc, train, SEASON);
+        return `<tr>
+          <td class="mono">${name}</td>
+          <td class="num">${Math.round(mae(test, fc)).toLocaleString()}</td>
+          <td class="num">${Math.round(rmse(test, fc)).toLocaleString()}</td>
+          <td class="num">${mape(test, fc).toFixed(1)}%</td>
+          <td class="num">${m.toFixed(3)}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    let currentFold = 0;
+    function backtestFolds(series) {
+      const testLen = Math.min(SEASON, Math.floor(series.length / 4));
+      const folds = [];
+      const minTrain = Math.floor(series.length / 2 / SEASON) * SEASON;
+      for (let origin = minTrain; origin + testLen <= series.length; origin += SEASON) {
+        folds.push({ origin, train: series.slice(0, origin), test: series.slice(origin, origin + testLen) });
+      }
+      return folds.slice(0, 6);
+    }
+
+    function renderBacktest(key, alpha, beta, gamma) {
+      const folds = backtestFolds(SERIES);
+      if (!folds.length) return;
+      if (currentFold >= folds.length) currentFold = folds.length - 1;
+      const slider = document.getElementById("foldSlider");
+      slider.max = String(folds.length - 1);
+      slider.value = String(currentFold);
+      document.getElementById("foldLabel").textContent = `fold ${currentFold + 1} / ${folds.length}`;
+
+      const results = folds.map((f) => {
+        const m = fitModel(key, f.train, alpha, beta, gamma);
+        const fc = m.predict(f.test.length);
+        return {
+          ...f, fc,
+          mase: mase(f.test, fc, f.train, SEASON),
+          mae: mae(f.test, fc),
+          rmse: rmse(f.test, fc),
+          mape: mape(f.test, fc),
+        };
+      });
+
+      const bt = document.getElementById("backtest");
+      const bctx = bt.getContext("2d");
+      const dpr = window.devicePixelRatio || 1;
+      const w = bt.clientWidth || 920, h = 300;
+      bt.width = w * dpr; bt.height = h * dpr; bt.style.height = h + "px";
+      bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      bctx.clearRect(0, 0, w, h);
+
+      const cur = results[currentFold];
+      const pad = { l: 56, r: 14, t: 16, b: 30 };
+      const n = SERIES.length;
+      const lo = Math.min(...SERIES, ...cur.fc) * 0.97;
+      const hi = Math.max(...SERIES, ...cur.fc) * 1.02;
+      const X = (i) => pad.l + (i / (n - 1)) * (w - pad.l - pad.r);
+      const Y = (v) => pad.t + (1 - (v - lo) / (hi - lo || 1)) * (h - pad.t - pad.b);
+      const muted = css("--muted"), border = css("--border"), accent = css("--accent");
+
+      bctx.strokeStyle = border; bctx.fillStyle = muted; bctx.font = "11px ui-monospace, monospace";
+      for (let g = 0; g <= 4; g++) {
+        const v = lo + ((hi - lo) * g) / 4;
+        const yy = Y(v);
+        bctx.beginPath(); bctx.moveTo(pad.l, yy); bctx.lineTo(w - pad.r, yy); bctx.stroke();
+        bctx.textAlign = "right"; bctx.fillText(Math.round(v).toLocaleString(), pad.l - 6, yy + 3);
+      }
+
+      // train region shade
+      bctx.fillStyle = "rgba(37,99,235,0.07)";
+      bctx.fillRect(pad.t > 0 ? X(0) : X(0), pad.t, X(cur.origin - 1) - X(0), h - pad.t - pad.b);
+      // test region shade
+      bctx.fillStyle = "rgba(245,158,11,0.12)";
+      bctx.fillRect(X(cur.origin), pad.t, X(cur.origin + cur.test.length - 1) - X(cur.origin), h - pad.t - pad.b);
+
+      // full series greyed outside focus
+      bctx.strokeStyle = css("--muted"); bctx.globalAlpha = 0.35; bctx.lineWidth = 1.4;
+      bctx.beginPath();
+      SERIES.forEach((v, i) => (i ? bctx.lineTo(X(i), Y(v)) : bctx.moveTo(X(i), Y(v))));
+      bctx.stroke(); bctx.globalAlpha = 1;
+
+      // train window solid
+      bctx.strokeStyle = accent; bctx.lineWidth = 2;
+      bctx.beginPath();
+      cur.train.forEach((v, i) => (i ? bctx.lineTo(X(i), Y(v)) : bctx.moveTo(X(i), Y(v))));
+      bctx.stroke();
+
+      // test actual
+      bctx.strokeStyle = "#f59e0b"; bctx.lineWidth = 2.4;
+      bctx.beginPath();
+      cur.test.forEach((v, i) => { const xx = X(cur.origin + i); i === 0 ? bctx.moveTo(xx, Y(v)) : bctx.lineTo(xx, Y(v)); });
+      bctx.stroke();
+
+      // forecast
+      bctx.strokeStyle = css("--good"); bctx.lineWidth = 2; bctx.setLineDash([6, 4]);
+      bctx.beginPath();
+      bctx.moveTo(X(cur.origin - 1), Y(cur.train[cur.train.length - 1]));
+      cur.fc.forEach((v, i) => bctx.lineTo(X(cur.origin + i), Y(v)));
+      bctx.stroke(); bctx.setLineDash([]);
+
+      bctx.fillStyle = muted; bctx.textAlign = "left";
+      bctx.fillText("t=0", pad.l, h - 8);
+      bctx.textAlign = "right"; bctx.fillText("t=" + (n - 1), w - pad.r, h - 8);
+
+      document.getElementById("foldStats").innerHTML = `
+        <div class="stat"><div class="k">MASE</div><div class="v ${cur.mase < 1 ? "good" : ""}">${cur.mase.toFixed(3)}</div></div>
+        <div class="stat"><div class="k">MAE</div><div class="v">${Math.round(cur.mae).toLocaleString()}</div></div>
+        <div class="stat"><div class="k">RMSE</div><div class="v">${Math.round(cur.rmse).toLocaleString()}</div></div>
+        <div class="stat"><div class="k">MAPE</div><div class="v">${cur.mape.toFixed(1)}%</div></div>
+      `;
+
+      document.getElementById("foldBody").innerHTML = results.map((r, i) => `
+        <tr${i === currentFold ? ' style="background:color-mix(in srgb, var(--accent) 8%, transparent)"' : ""}>
+          <td>${i + 1}</td>
+          <td class="num">${r.train.length}</td>
+          <td class="num">${r.test.length}</td>
+          <td class="num">${r.mase.toFixed(3)}</td>
+          <td class="num">${Math.round(r.mae).toLocaleString()}</td>
+          <td class="num">${Math.round(r.rmse).toLocaleString()}</td>
+          <td class="num">${r.mape.toFixed(1)}%</td>
+        </tr>`).join("");
+
+      const meanMase = results.reduce((s, r) => s + r.mase, 0) / results.length;
+      const below = results.filter((r) => r.mase < 1).length;
+      document.getElementById("foldSummary").innerHTML =
+        `<strong>${models[key].name}</strong>: mean MASE <span class="mono">${meanMase.toFixed(3)}</span> across ${results.length} folds — ` +
+        (meanMase < 1
+          ? `beats seasonal naive on average (${below}/${results.length} folds below 1.0).`
+          : `does not beat seasonal naive on average (only ${below}/${results.length} folds below 1.0).`);
+    }
+
+    function renderDiagnostics(test, fc) {
+      const residuals = test.map((v, i) => v - fc[i]);
+      const ac = document.getElementById("acf");
+      const actx = ac.getContext("2d");
+      const dpr = window.devicePixelRatio || 1;
+      const w = ac.clientWidth || 440, h = 260;
+      ac.width = w * dpr; ac.height = h * dpr; ac.style.height = h + "px";
+      actx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      actx.clearRect(0, 0, w, h);
+
+      const muted = css("--muted"), border = css("--border"), accent = css("--accent");
+      const pad = { l: 40, r: 12, t: 14, b: 30 };
+      const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+
+      if (residuals.length < 6) {
+        actx.fillStyle = muted; actx.font = "13px system-ui"; actx.textAlign = "center";
+        actx.fillText("Hold-out too small for diagnostics — raise hold-out points.", w / 2, h / 2);
+        document.getElementById("diagStats").innerHTML = "";
+        document.getElementById("normalityHint").textContent = "Need at least 6 residuals.";
+        return;
+      }
+
+      const lags = acf(residuals, Math.min(12, residuals.length - 2));
+      const bound = 2 / Math.sqrt(residuals.length);
+      const X = (i) => pad.l + ((i + 0.5) / lags.length) * iw;
+      const Y = (v) => pad.t + ((1 - v) / 2) * ih;
+
+      actx.strokeStyle = border; actx.fillStyle = muted; actx.font = "11px ui-monospace, monospace";
+      [-1, -0.5, 0, 0.5, 1].forEach((v) => {
+        const yy = Y(v);
+        actx.beginPath(); actx.moveTo(pad.l, yy); actx.lineTo(w - pad.r, yy); actx.stroke();
+        actx.textAlign = "right"; actx.fillText(v.toFixed(1), pad.l - 6, yy + 3);
+      });
+      // bound lines
+      actx.strokeStyle = "rgba(220,38,38,0.5)"; actx.setLineDash([4, 4]);
+      actx.beginPath(); actx.moveTo(pad.l, Y(bound)); actx.lineTo(w - pad.r, Y(bound)); actx.stroke();
+      actx.beginPath(); actx.moveTo(pad.l, Y(-bound)); actx.lineTo(w - pad.r, Y(-bound)); actx.stroke();
+      actx.setLineDash([]);
+
+      const barW = Math.max(4, (iw / lags.length) * 0.6);
+      lags.forEach((r, i) => {
+        const yy = Y(Math.max(-1, Math.min(1, r)));
+        const y0 = Y(0);
+        actx.fillStyle = Math.abs(r) > bound ? css("--bad") : accent;
+        actx.globalAlpha = 0.85;
+        actx.fillRect(X(i) - barW / 2, Math.min(yy, y0), barW, Math.abs(y0 - yy));
+        actx.globalAlpha = 1;
+        actx.fillStyle = muted; actx.textAlign = "center";
+        actx.fillText(String(i + 1), X(i), h - 10);
+      });
+
+      const m = residMoments(residuals);
+      const maxAbsLag = Math.max(...lags.map(Math.abs));
+      document.getElementById("diagStats").innerHTML = `
+        <div class="stat"><div class="k">mean resid</div><div class="v">${Math.round(m.mean).toLocaleString()}</div></div>
+        <div class="stat"><div class="k">std</div><div class="v">${Math.round(m.sd).toLocaleString()}</div></div>
+        <div class="stat"><div class="k">skew</div><div class="v">${m.skew.toFixed(2)}</div></div>
+        <div class="stat"><div class="k">ex. kurtosis</div><div class="v">${m.exKurt.toFixed(2)}</div></div>
+        <div class="stat"><div class="k">max |ACF|</div><div class="v ${maxAbsLag > bound * 1.5 ? "bad" : "good"}">${maxAbsLag.toFixed(2)}</div></div>
+      `;
+
+      const roughlyNormal = Math.abs(m.skew) < 0.75 && Math.abs(m.exKurt) < 1.25;
+      const acfClean = maxAbsLag <= bound * 1.5;
+      document.getElementById("normalityHint").innerHTML =
+        `<strong>Normality hint:</strong> ${roughlyNormal
+          ? "skew and excess kurtosis are both modest — the residual distribution is roughly symmetric/light-tailed, which is what parametric intervals assume."
+          : "skew or excess kurtosis is large — residuals are not close to Gaussian here, so the 80/95% bands above are optimistic or pessimistic in the tails."} ` +
+        (acfClean
+          ? "No lag exceeds the 2/√n bound strongly — little autocorrelation left."
+          : "At least one lag exceeds 2/√n — the model left short-range structure in the errors (try Holt-Winters or a richer model).");
+    }
+
+    document.getElementById("foldSlider").addEventListener("input", (e) => {
+      currentFold = Number(e.target.value);
+      render(false);
+    });
+    document.getElementById("foldPrev").addEventListener("click", () => {
+      currentFold = Math.max(0, currentFold - 1); render(false);
+    });
+    document.getElementById("foldNext").addEventListener("click", () => {
+      const folds = backtestFolds(SERIES);
+      currentFold = Math.min(folds.length - 1, currentFold + 1); render(false);
+    });
+
+    function updateSynthLabels() {
+      document.getElementById("trendVal").textContent = Number(document.getElementById("synthTrend").value).toFixed(2);
+      document.getElementById("ampVal").textContent = Number(document.getElementById("synthAmp").value).toFixed(2);
+      document.getElementById("noiseVal").textContent = Number(document.getElementById("synthNoise").value).toFixed(2);
+      document.getElementById("ptsVal").textContent = document.getElementById("synthPoints").value;
+    }
+    function applySeriesSource() {
+      const srcSel = document.getElementById("seriesSource").value;
+      const isSynth = srcSel === "synthetic";
+      document.getElementById("synthControls").hidden = !isSynth;
+      document.getElementById("synthHint").hidden = !isSynth;
+      updateSynthLabels();
+      if (isSynth) {
+        SERIES = syntheticSeries(
+          Number(document.getElementById("synthSeed").value) || 7,
+          Number(document.getElementById("synthTrend").value),
+          Number(document.getElementById("synthAmp").value),
+          Number(document.getElementById("synthNoise").value),
+          Number(document.getElementById("synthPoints").value)
+        );
+      } else {
+        SERIES = EMBEDDED;
+      }
+      currentFold = 0;
+      render();
+    }
+    document.getElementById("seriesSource").addEventListener("change", applySeriesSource);
+    ["synthSeed"].forEach((id) => document.getElementById(id).addEventListener("change", applySeriesSource));
+    ["synthTrend", "synthAmp", "synthNoise", "synthPoints"].forEach((id) =>
+      document.getElementById(id).addEventListener("input", applySeriesSource)
+    );
 
     document.getElementById("runBtn").addEventListener("click", render);
     ["model", "holdout", "horizon", "alpha", "beta", "gamma"].forEach((id) =>
