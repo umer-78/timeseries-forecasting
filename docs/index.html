@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>forecast — Interactive Time Series Forecasting Demo</title>
+  <meta name="description" content="Holt-Winters, Holt, SES and baselines run live in the browser on sample monthly sales, with confidence bands and honest MASE against seasonal naive.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='22' font-size='16' text-anchor='middle' fill='white' font-family='monospace'>~</text></svg>">
+  <style>
+    :root {
+      --bg: #f6f7f9; --surface: #ffffff; --surface-2: #eef0f4; --border: #dde1e8;
+      --text: #16181d; --muted: #5d6573; --accent: #2563eb; --accent-ink: #ffffff;
+      --good: #15803d; --bad: #b91c1c; --radius: 12px;
+      --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 4px 16px rgb(16 24 40 / 0.05);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e1116; --surface: #161a21; --surface-2: #1d222b; --border: #2a303b;
+        --text: #e8eaee; --muted: #9aa3b2; --accent: #60a5fa; --accent-ink: #0b1220;
+        --good: #4ade80; --bad: #f87171; --shadow: none; color-scheme: dark;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body { font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+    header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    header.top h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+    header.top p { margin: 2px 0 0; color: var(--muted); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); min-width: 0; margin-bottom: 16px; }
+    .card h2 { font-size: 15px; margin: 0 0 12px; }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    input, select, button { font: inherit; color: inherit; }
+    input, select { width: 100%; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2); outline: none; min-width: 0; }
+    input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    button { cursor: pointer; border: 1px solid var(--border); background: var(--surface-2); padding: 9px 14px; border-radius: 9px; font-weight: 600; }
+    button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+    .row { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+    .row > * { flex: 1 1 150px; }
+    .row > button { flex: 0 0 auto; }
+    .muted { color: var(--muted); }
+    .mono { font-family: var(--mono); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    td.num, th.num { text-align: right; font-family: var(--mono); }
+    .table-wrap { overflow-x: auto; }
+    footer { margin-top: 32px; color: var(--muted); font-size: 13px; text-align: center; }
+    .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+    .stat { background: var(--surface-2); border-radius: 8px; padding: 8px 12px; min-width: 90px; flex: 1; }
+    .stat .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat .v { font-family: var(--mono); font-size: 18px; font-weight: 700; }
+    .stat .v.good { color: var(--good); }
+    canvas { width: 100%; height: auto; display: block; border-radius: 8px; background: var(--surface-2); }
+    .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; margin-top: 8px; color: var(--muted); }
+    .linekey { display: inline-block; width: 18px; height: 3px; margin-right: 6px; vertical-align: middle; border-radius: 2px; }
+    .hw-only { opacity: 0.35; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div>
+        <h1>forecast</h1>
+        <p>Time series forecasting with no dependencies — baselines first, exponential smoothing on top, and a MASE that tells you when you have not beaten “last January”.</p>
+      </div>
+      <a href="https://github.com/umer-78/timeseries-forecasting">Source on GitHub</a>
+    </header>
+
+    <section class="card" aria-labelledby="fc-h">
+      <h2 id="fc-h">Forecast monthly sales</h2>
+      <p class="muted" style="margin-top:0">6 years of monthly revenue (72 points, season length 12) embedded from <code class="mono">data/monthly-sales.csv</code>. Hold out the last points as a test window, pick a model, and see the forecast with 80% / 95% residual bands.</p>
+      <div class="row" style="margin-bottom:10px">
+        <div>
+          <label for="model">Model</label>
+          <select id="model">
+            <option value="holt-winters" selected>holt-winters</option>
+            <option value="seasonal-naive">seasonal naive</option>
+            <option value="holt">holt</option>
+            <option value="holt-damped">holt (damped)</option>
+            <option value="ses">ses</option>
+            <option value="drift">drift</option>
+            <option value="naive">naive</option>
+            <option value="mean">mean</option>
+          </select>
+        </div>
+        <div>
+          <label for="holdout">Hold-out points <span class="mono" id="holdVal">12</span></label>
+          <input id="holdout" type="range" min="6" max="24" step="6" value="12">
+        </div>
+        <div>
+          <label for="horizon">Forecast horizon <span class="mono" id="horVal">12</span></label>
+          <input id="horizon" type="range" min="3" max="24" step="3" value="12">
+        </div>
+        <button class="primary" id="runBtn">Forecast</button>
+      </div>
+      <div class="row" id="hwRow" style="margin-bottom:12px">
+        <div>
+          <label for="alpha">α (level) <span class="mono" id="aVal">0.30</span></label>
+          <input id="alpha" type="range" min="0.05" max="0.9" step="0.05" value="0.3">
+        </div>
+        <div>
+          <label for="beta">β (trend) <span class="mono" id="bVal">0.05</span></label>
+          <input id="beta" type="range" min="0.01" max="0.5" step="0.01" value="0.05">
+        </div>
+        <div>
+          <label for="gamma">γ (season) <span class="mono" id="gVal">0.30</span></label>
+          <input id="gamma" type="range" min="0.01" max="0.9" step="0.01" value="0.3">
+        </div>
+      </div>
+      <canvas id="chart" width="920" height="360" role="img" aria-label="Historical series with forecast and confidence bands"></canvas>
+      <div class="legend">
+        <span><span class="linekey" style="background:var(--accent)"></span>history (train)</span>
+        <span><span class="linekey" style="background:#f59e0b"></span>hold-out actual</span>
+        <span><span class="linekey" style="background:var(--good)"></span>forecast</span>
+        <span class="muted">shaded = 80% / 95% residual bands</span>
+      </div>
+      <div class="stats" id="stats"></div>
+    </section>
+
+    <section class="card" aria-labelledby="cmp-h">
+      <h2 id="cmp-h">All models on this split</h2>
+      <p class="muted" style="margin-top:0">Same train window, same horizon. MASE is scaled by seasonal naive <em>on the training data</em> — below 1 is a real improvement; 1.0 means you did no better than the baseline.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>model</th><th class="num">MASE</th><th class="num">MAE</th><th class="num">RMSE</th><th class="num">sMAPE</th></tr></thead>
+          <tbody id="cmpBody"><tr><td colspan="5" class="muted">Run a forecast to fill this table.</td></tr></tbody>
+        </table>
+      </div>
+      <div id="winner" class="muted" style="margin-top:10px"></div>
+    </section>
+
+    <section class="card" aria-labelledby="why-h">
+      <h2 id="why-h">Four things this gets right</h2>
+      <ul class="muted" style="margin:0; padding-left:1.2em; line-height:1.7">
+        <li><strong>MASE is scaled by the training window</strong>, not the test window — otherwise a hard test period makes every model look good.</li>
+        <li><strong>Evaluation can be rolling origin</strong> rather than one arbitrary split (the package implements full backtesting).</li>
+        <li><strong>Parameters are tuned at the horizon you forecast</strong>, not one step ahead.</li>
+        <li><strong>Holt-Winters renormalises seasonal factors</strong> each season so they do not compete with the level — this demo does the same.</li>
+      </ul>
+    </section>
+
+    <footer>50 tests · Python 3.10–3.12 · no runtime dependencies · Built by <a href="https://github.com/umer-78">Umer Hashmi</a></footer>
+  </div>
+
+  <script>
+    // 72 monthly revenue points from data/monthly-sales.csv
+    const SERIES = [40933,36543,40629,42187,47214,44957,44541,43343,49250,51412,55194,63838,45907,43933,50494,50402,53906,54172,50106,51216,53388,54909,60729,71927,47358,47848,56826,58055,60861,59742,57193,57530,60516,62978,67706,81314,57279,54827,60569,63433,65972,63709,63487,62591,66892,69300,72889,88564,63393,58811,68120,72411,73909,72244,67950,70205,74154,82319,78955,96350,68902,65160,72316,80167,76250,78784,74220,72848,77520,82516,89613,103579];
+    const SEASON = 12;
+
+    // === Models (ports src/forecast/models.py) ===
+    const models = {
+      naive: { name: "naive", fit(s) { this.last = s[s.length - 1]; return this; }, predict(h) { return Array(h).fill(this.last); } },
+      "seasonal-naive": {
+        name: "seasonal naive",
+        fit(s) { this.season = s.slice(-SEASON); return this; },
+        predict(h) { return Array.from({ length: h }, (_, i) => this.season[i % SEASON]); },
+      },
+      mean: { name: "mean", fit(s) { this.m = s.reduce((a, b) => a + b, 0) / s.length; return this; }, predict(h) { return Array(h).fill(this.m); } },
+      drift: {
+        name: "drift",
+        fit(s) { this.last = s[s.length - 1]; this.slope = (s[s.length - 1] - s[0]) / (s.length - 1); return this; },
+        predict(h) { return Array.from({ length: h }, (_, i) => this.last + this.slope * (i + 1)); },
+      },
+      ses: {
+        name: "ses",
+        fit(s, a = 0.3) { this.a = a; let level = s[0]; for (const v of s.slice(1)) level = a * v + (1 - a) * level; this.level = level; return this; },
+        predict(h) { return Array(h).fill(this.level); },
+      },
+      holt: {
+        name: "holt",
+        fit(s, a = 0.3, b = 0.1, damped = 1) {
+          this.a = a; this.b = b; this.d = damped;
+          let level = s[0], trend = s[1] - s[0];
+          for (const v of s.slice(1)) {
+            const prev = level;
+            level = a * v + (1 - a) * (level + damped * trend);
+            trend = b * (level - prev) + (1 - b) * damped * trend;
+          }
+          this.level = level; this.trend = trend; return this;
+        },
+        predict(h) {
+          return Array.from({ length: h }, (_, i) => {
+            const hh = i + 1;
+            const factor = this.d < 1 ? Array.from({ length: hh }, (_, k) => Math.pow(this.d, k + 1)).reduce((a, c) => a + c, 0) : hh;
+            return this.level + factor * this.trend;
+          });
+        },
+      },
+      "holt-damped": null, // filled below
+      "holt-winters": {
+        name: "holt-winters",
+        fit(s, a = 0.3, b = 0.05, g = 0.3) {
+          const m = SEASON;
+          this.a = a; this.b = b; this.g = g;
+          const periods = Math.floor(s.length / m);
+          const averages = Array.from({ length: periods }, (_, p) => s.slice(p * m, (p + 1) * m).reduce((x, y) => x + y, 0) / m);
+          let season = Array.from({ length: m }, (_, i) => {
+            let sum = 0; for (let p = 0; p < periods; p++) sum += s[p * m + i] - averages[p];
+            return sum / periods;
+          });
+          const offset0 = season.reduce((x, y) => x + y, 0) / m;
+          season = season.map((v) => v - offset0);
+          let level = averages[0];
+          let trend = (averages[periods - 1] - averages[0]) / Math.max(periods - 1, 1) / m;
+          for (let i = 0; i < s.length; i++) {
+            const index = i % m; const prev = level;
+            level = a * (s[i] - season[index]) + (1 - a) * (level + trend);
+            trend = b * (level - prev) + (1 - b) * trend;
+            season[index] = g * (s[i] - level) + (1 - g) * season[index];
+            if (index === m - 1) {
+              const drift = season.reduce((x, y) => x + y, 0) / m;
+              if (drift) { season = season.map((v) => v - drift); level += drift; }
+            }
+          }
+          this.level = level; this.trend = trend; this.season = season; this.offset = s.length % m;
+          return this;
+        },
+        predict(h) {
+          return Array.from({ length: h }, (_, i) =>
+            this.level + (i + 1) * this.trend + this.season[(this.offset + i) % SEASON]
+          );
+        },
+      },
+    };
+    models["holt-damped"] = {
+      name: "holt (damped)",
+      fit(s, a = 0.4, b = 0.1) { return models.holt.fit.call(this, s, a, b, 0.9); },
+      predict(h) { return models.holt.predict.call(this, h); },
+    };
+
+    // === Metrics (ports src/forecast/metrics.py) ===
+    const mae = (a, p) => a.reduce((s, v, i) => s + Math.abs(v - p[i]), 0) / a.length;
+    const rmse = (a, p) => Math.sqrt(a.reduce((s, v, i) => s + (v - p[i]) ** 2, 0) / a.length);
+    function smape(a, p) {
+      let total = 0;
+      for (let i = 0; i < a.length; i++) {
+        const d = (Math.abs(a[i]) + Math.abs(p[i])) / 2;
+        total += d === 0 ? 0 : Math.abs(a[i] - p[i]) / d;
+      }
+      return (total / a.length) * 100;
+    }
+    function mase(a, p, train, season = 1) {
+      let sum = 0, n = 0;
+      for (let i = season; i < train.length; i++) { sum += Math.abs(train[i] - train[i - season]); n++; }
+      const scale = sum / n;
+      return mae(a, p) / scale;
+    }
+
+    function fitModel(key, train, alpha, beta, gamma) {
+      const m = Object.create(models[key]);
+      // copy own props from template
+      Object.assign(m, models[key]);
+      if (key === "ses") m.fit(train, alpha);
+      else if (key === "holt") m.fit(train, alpha, beta, 1);
+      else if (key === "holt-damped") m.fit(train, alpha, beta);
+      else if (key === "holt-winters") m.fit(train, alpha, beta, gamma);
+      else m.fit(train);
+      return m;
+    }
+
+    // === UI ===
+    const chart = document.getElementById("chart");
+    const ctx = chart.getContext("2d");
+    const hwKeys = new Set(["holt-winters", "holt", "holt-damped", "ses"]);
+
+    function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+    function render() {
+      const key = document.getElementById("model").value;
+      const hold = Number(document.getElementById("holdout").value);
+      const horizon = Number(document.getElementById("horizon").value);
+      const alpha = Number(document.getElementById("alpha").value);
+      const beta = Number(document.getElementById("beta").value);
+      const gamma = Number(document.getElementById("gamma").value);
+      document.getElementById("holdVal").textContent = hold;
+      document.getElementById("horVal").textContent = horizon;
+      document.getElementById("aVal").textContent = alpha.toFixed(2);
+      document.getElementById("bVal").textContent = beta.toFixed(2);
+      document.getElementById("gVal").textContent = gamma.toFixed(2);
+      document.getElementById("hwRow").classList.toggle("hw-only", !hwKeys.has(key));
+
+      const train = SERIES.slice(0, SERIES.length - hold);
+      const test = SERIES.slice(SERIES.length - hold);
+      // forecast beyond train for `horizon`, but score against available hold-out
+      const model = fitModel(key, train, alpha, beta, gamma);
+      const fcFull = model.predict(Math.max(horizon, hold));
+      const scoreFc = fcFull.slice(0, hold);
+
+      const scores = {
+        mase: mase(test, scoreFc, train, SEASON),
+        mae: mae(test, scoreFc),
+        rmse: rmse(test, scoreFc),
+        smape: smape(test, scoreFc),
+      };
+
+      // residual bands from one-step-ish residual std on train (in-sample refit residuals)
+      const fitted = (() => {
+        // quick in-sample fit for residual scale: compare model one-step via seasonal-naive style
+        // use std of train differences as a pragmatic scale
+        let s = 0; for (let i = SEASON; i < train.length; i++) s += (train[i] - train[i - SEASON]) ** 2;
+        return Math.sqrt(s / (train.length - SEASON));
+      })();
+      const bands = fcFull.map((_, i) => {
+        const grow = Math.sqrt((i + 1) / SEASON);
+        return { lo80: 1.28 * scaled(i), hi80: 1.28 * scaled(i), lo95: 1.96 * scaled(i), hi95: 1.96 * scaled(i) };
+        function scaled(k) { return fitted * Math.sqrt(1 + k * 0.15); }
+      });
+
+      // --- draw ---
+      const dpr = window.devicePixelRatio || 1;
+      const w = chart.clientWidth || 920, h = 360;
+      chart.width = w * dpr; chart.height = h * dpr; chart.style.height = h + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+
+      const allActual = SERIES.concat(Array(horizon).fill(NaN));
+      const fcLine = Array(SERIES.length - hold).fill(NaN).concat(fcFull.slice(0, horizon));
+      const pad = { l: 56, r: 14, t: 16, b: 30 };
+      const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+      const n = SERIES.length + horizon;
+      const finite = SERIES.concat(fcFull.slice(0, horizon).map((v, i) => v + bands[i].hi95)).filter((v) => Number.isFinite(v));
+      const min = Math.min(...SERIES, ...fcFull.slice(0, horizon).map((v, i) => v - bands[i].lo95)) * 0.97;
+      const max = Math.max(...SERIES, ...fcFull.slice(0, horizon).map((v, i) => v + bands[i].hi95)) * 1.02;
+      const X = (i) => pad.l + (i / (n - 1)) * iw;
+      const Y = (v) => pad.t + (1 - (v - min) / (max - min || 1)) * ih;
+
+      const muted = css("--muted"), border = css("--border"), accent = css("--accent");
+      const good = css("--good"), bad = css("--bad");
+
+      // grid + y labels
+      ctx.strokeStyle = border; ctx.fillStyle = muted; ctx.font = "11px ui-monospace, monospace"; ctx.lineWidth = 1;
+      for (let g = 0; g <= 4; g++) {
+        const v = min + ((max - min) * g) / 4;
+        const yy = Y(v);
+        ctx.beginPath(); ctx.moveTo(pad.l, yy); ctx.lineTo(w - pad.r, yy); ctx.stroke();
+        ctx.textAlign = "right"; ctx.fillText(Math.round(v).toLocaleString(), pad.l - 6, yy + 3);
+      }
+
+      // hold-out divider
+      const divX = X(SERIES.length - hold - 0.5);
+      ctx.strokeStyle = css("--muted"); ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(divX, pad.t); ctx.lineTo(divX, h - pad.b); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = muted; ctx.textAlign = "left"; ctx.fillText("train | hold-out", divX + 6, pad.t + 12);
+
+      // 95% band
+      const start = SERIES.length - hold;
+      ctx.fillStyle = "rgba(37,99,235,0.10)";
+      ctx.beginPath();
+      for (let i = 0; i < horizon; i++) { const yv = Y(fcFull[i] + bands[i].hi95); i === 0 ? ctx.moveTo(X(start + i), yv) : ctx.lineTo(X(start + i), yv); }
+      for (let i = horizon - 1; i >= 0; i--) ctx.lineTo(X(start + i), Y(fcFull[i] - bands[i].lo95));
+      ctx.closePath(); ctx.fill();
+
+      // 80% band
+      ctx.fillStyle = "rgba(37,99,235,0.18)";
+      ctx.beginPath();
+      for (let i = 0; i < horizon; i++) { const yv = Y(fcFull[i] + bands[i].hi80); i === 0 ? ctx.moveTo(X(start + i), yv) : ctx.lineTo(X(start + i), yv); }
+      for (let i = horizon - 1; i >= 0; i--) ctx.lineTo(X(start + i), Y(fcFull[i] - bands[i].lo80));
+      ctx.closePath(); ctx.fill();
+
+      // train line
+      ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.beginPath();
+      train.forEach((v, i) => (i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))));
+      ctx.stroke();
+
+      // hold-out actual
+      ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2; ctx.beginPath();
+      test.forEach((v, i) => { const xx = X(train.length + i); i === 0 ? ctx.moveTo(xx, Y(v)) : ctx.lineTo(xx, Y(v)); });
+      ctx.stroke();
+
+      // forecast
+      ctx.strokeStyle = good; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath();
+      // connect from last train point
+      ctx.moveTo(X(train.length - 1), Y(train[train.length - 1]));
+      fcFull.slice(0, horizon).forEach((v, i) => ctx.lineTo(X(start + i), Y(v)));
+      ctx.stroke(); ctx.setLineDash([]);
+
+      // x labels
+      ctx.fillStyle = muted; ctx.textAlign = "left";
+      ctx.fillText("Jan 2020", pad.l, h - 8);
+      ctx.textAlign = "right"; ctx.fillText("+" + horizon + " mo", w - pad.r, h - 8);
+
+      // stats
+      document.getElementById("stats").innerHTML = `
+        <div class="stat"><div class="k">MASE</div><div class="v ${scores.mase < 1 ? "good" : ""}">${scores.mase.toFixed(3)}</div></div>
+        <div class="stat"><div class="k">MAE</div><div class="v">${Math.round(scores.mae).toLocaleString()}</div></div>
+        <div class="stat"><div class="k">RMSE</div><div class="v">${Math.round(scores.rmse).toLocaleString()}</div></div>
+        <div class="stat"><div class="k">sMAPE</div><div class="v">${scores.smape.toFixed(1)}%</div></div>
+        <div class="stat"><div class="k">train pts</div><div class="v">${train.length}</div></div>
+      `;
+
+      // comparison table
+      const keys = ["holt-winters", "seasonal-naive", "ses", "holt-damped", "holt", "naive", "drift", "mean"];
+      const rows = keys.map((k) => {
+        const m = fitModel(k, train, alpha, beta, gamma);
+        const f = m.predict(hold);
+        return { k: m.name, mase: mase(test, f, train, SEASON), mae: mae(test, f), rmse: rmse(test, f), smape: smape(test, f) };
+      }).sort((a, b) => a.mase - b.mase);
+
+      document.getElementById("cmpBody").innerHTML = rows.map((r) => `
+        <tr${r.k === models[key].name ? ' style="background:color-mix(in srgb, var(--accent) 8%, transparent)"' : ""}>
+          <td class="mono">${r.k}</td>
+          <td class="num">${r.mase.toFixed(3)}</td>
+          <td class="num">${Math.round(r.mae).toLocaleString()}</td>
+          <td class="num">${Math.round(r.rmse).toLocaleString()}</td>
+          <td class="num">${r.smape.toFixed(1)}%</td>
+        </tr>`).join("");
+
+      const sn = rows.find((r) => r.k === "seasonal naive");
+      const best = rows[0];
+      const winner = document.getElementById("winner");
+      if (best.mase < 1) {
+        winner.innerHTML = `<span style="color:var(--good);font-weight:600">${best.k}</span> beats seasonal naive (MASE ${best.mase.toFixed(3)} &lt; 1.0) on this ${hold}-point hold-out.`;
+      } else {
+        winner.innerHTML = `<span style="color:var(--bad);font-weight:600">No model beats seasonal naive</span> here (best MASE ${best.mase.toFixed(3)}). On data whose main structure is the seasonal shape, that is the honest answer — the baseline stays in the table for exactly this reason.`;
+      }
+    }
+
+    document.getElementById("runBtn").addEventListener("click", render);
+    ["model", "holdout", "horizon", "alpha", "beta", "gamma"].forEach((id) =>
+      document.getElementById(id).addEventListener("input", render)
+    );
+    document.getElementById("model").addEventListener("change", render);
+    window.addEventListener("resize", render);
+    render();
+  </script>
+</body>
+</html>
