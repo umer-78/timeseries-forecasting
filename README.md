@@ -1,5 +1,9 @@
 # forecast
 
+[![CI](https://github.com/umer-78/timeseries-forecasting/actions/workflows/ci.yml/badge.svg)](https://github.com/umer-78/timeseries-forecasting/actions/workflows/ci.yml)
+
+**Live demo:** https://umer-78.github.io/timeseries-forecasting/
+
 Time series forecasting in Python, with no dependencies: baselines, exponential
 smoothing, a parameter search, and rolling-origin backtesting that does not lie
 to you about how good the model is.
