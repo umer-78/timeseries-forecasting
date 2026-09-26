@@ -1,4 +1,4 @@
-# forecast
+# forecast: time series forecasting
 
 [![CI](https://github.com/umer-78/timeseries-forecasting/actions/workflows/ci.yml/badge.svg)](https://github.com/umer-78/timeseries-forecasting/actions/workflows/ci.yml)
 

@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "forecast"
+name = "timeseries-forecasting"
 version = "1.0.0"
-description = "Time series forecasting: baselines, exponential smoothing, parameter search and rolling-origin backtesting."
+description = "Time series forecasting in Python with no runtime dependencies: baselines, exponential smoothing, parameter search and rolling-origin backtesting."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Umer Hashmi" }]
