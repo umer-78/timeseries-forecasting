@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/umer-78/timeseries-forecasting/actions/workflows/ci.yml/badge.svg)](https://github.com/umer-78/timeseries-forecasting/actions/workflows/ci.yml)
 
+[![Time Series Forecasting: the live demo](.github/preview.jpg)](https://umer-78.github.io/timeseries-forecasting/)
+
 **Live demo:** https://umer-78.github.io/timeseries-forecasting/
 
 Time series forecasting in Python, with no dependencies: baselines, exponential
